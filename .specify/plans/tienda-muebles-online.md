@@ -47,7 +47,7 @@ tienda-muebles/
 │   ├── vite.config.ts
 │   └── Dockerfile
 │
-├── docker-compose.yml         # PostgreSQL + MinIO + backend + frontend
+├── docker-compose.yml         # H2 (modo servidor) + MinIO + backend + frontend
 └── docs/
 ```
 
@@ -231,7 +231,7 @@ RefreshToken
 | Java | 17 | Lenguaje |
 | Spring Security | 6.x | Autenticación / autorización |
 | Spring Data JPA | 3.3.x | Persistencia |
-| PostgreSQL | 16 | Base de datos |
+| H2 | 2.x | Base de datos (embebida en dev; modo servidor opcional) |
 | Flyway | 10.x | Migraciones de BD |
 | MapStruct | 1.5.x | Mapeo entidad ↔ DTO |
 | jjwt (io.jsonwebtoken) | 0.12.x | Generación/validación JWT |
@@ -240,7 +240,7 @@ RefreshToken
 | Spring Mail | 3.3.x | Envío de emails |
 | Lombok | 1.18.x | Reducción boilerplate |
 | JUnit 5 + Mockito | incluido | Tests |
-| Testcontainers | 1.19.x | Tests de integración con BD real |
+| H2 | 2.x | BD embebida para tests y desarrollo local |
 
 ### Frontend
 | Librería | Versión | Propósito |
@@ -296,8 +296,8 @@ RefreshToken
                           ┌────────┼────────────┐
                           │        │             │
                ┌──────────▼─┐  ┌───▼────┐  ┌───▼───┐
-               │ PostgreSQL │  │  S3/   │  │ SMTP  │
-               │   (16)     │  │ MinIO  │  │ server│
+               │    H2      │  │  S3/   │  │ SMTP  │
+               │   (2.x)    │  │ MinIO  │  │ server│
                └────────────┘  └────────┘  └───────┘
                           │
                ┌──────────▼──────────┐

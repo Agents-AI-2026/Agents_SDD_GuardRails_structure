@@ -14,7 +14,7 @@
 - **Subtareas**:
   - [ ] Crear proyecto Spring Boot con Spring Initializr (Java 17, dependencias: Web, Security, Data JPA, Validation, Mail, Flyway, Lombok)
   - [ ] Crear proyecto React + TypeScript con Vite
-  - [ ] Configurar `docker-compose.yml` con PostgreSQL 16 y MinIO
+  - [ ] Configurar `docker-compose.yml` con H2 (modo servidor para dev) y MinIO
   - [ ] Configurar `application.yml` y `application-dev.yml` (sin secrets hardcodeados; usar variables de entorno)
   - [ ] Configurar Flyway en el backend
 - **Criterio de aceptación**: `docker compose up` levanta la BD, MinIO, backend y frontend sin errores.
@@ -43,7 +43,7 @@
   - [ ] Entidad `User` + `UserRepository`
   - [ ] `UserService.register()` con validación de email único y hash BCrypt
   - [ ] `AuthController` con DTOs de request/response
-  - [ ] Tests de integración con Testcontainers
+  - [ ] Tests de integración con H2 en memoria
 - **Criterio de aceptación**: Registro con email duplicado devuelve 409. Login correcto devuelve JWT.
 
 ### TASK-004 — Refresh token y logout
@@ -99,7 +99,7 @@
   - [ ] Migraciones V2 (tabla Product)
   - [ ] Entidad `Product` + repositorio
   - [ ] Listado paginado con filtros (categoría, precio min/max, disponibilidad)
-  - [ ] Búsqueda por texto con `ILIKE` o Full-Text Search de PostgreSQL
+  - [ ] Búsqueda por texto con `LIKE` (H2-compatible) en nombre y descripción
   - [ ] CRUD admin con validaciones
   - [ ] Tests de integración
 - **Criterio de aceptación**: Filtros combinados devuelven resultados correctos. Producto inactivo no aparece en catálogo público.
@@ -143,7 +143,7 @@
   - [ ] Entidades + repositorios
   - [ ] `OrderService.checkout()` con `SELECT FOR UPDATE` en stock
   - [ ] Si stock insuficiente → excepción; pedido no se crea
-  - [ ] Tests de integración con Testcontainers (race condition simulada)
+  - [ ] Tests de integración con H2 en memoria (race condition simulada)
 - **Criterio de aceptación**: Dos peticiones simultáneas al último item; solo una crea el pedido.
 
 ### TASK-012 — Integración Stripe (PaymentIntent)
@@ -263,7 +263,7 @@
 - **Estado**: `TODO`
 - **Descripción**: Pipeline de integración continua.
 - **Subtareas**:
-  - [ ] GitHub Actions workflow: build + test backend (con Testcontainers)
+  - [ ] GitHub Actions workflow: build + test backend (H2 en memoria)
   - [ ] GitHub Actions workflow: lint + test frontend
   - [ ] Bloquear merge si checks no pasan
 

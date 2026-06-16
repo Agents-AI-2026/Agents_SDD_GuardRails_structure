@@ -59,8 +59,8 @@ La plataforma se construye con una API REST en Spring Boot (Java 17) como backen
                           ┌────────┼────────────┐
                           │        │             │
                ┌──────────▼─┐  ┌───▼────┐  ┌───▼───┐
-               │ PostgreSQL │  │  S3/   │  │ SMTP  │
-               │   (16)     │  │ MinIO  │  │ server│
+               │    H2      │  │  S3/   │  │ SMTP  │
+               │   (2.x)    │  │ MinIO  │  │ server│
                └────────────┘  └────────┘  └───────┘
                                    │
                ┌───────────────────▼─────────────────┐
@@ -75,7 +75,7 @@ La plataforma se construye con una API REST en Spring Boot (Java 17) como backen
 |------------|-----------------|------------|
 | Frontend SPA | Interfaz de usuario pública y panel admin | React 18 + TypeScript + Vite |
 | Backend API | Lógica de negocio, persistencia, seguridad | Spring Boot 3.3 + Java 17 |
-| Base de datos | Persistencia relacional | PostgreSQL 16 |
+| Base de datos | Persistencia relacional | H2 2.x |
 | Almacenamiento de imágenes | Upload y servicio de imágenes de productos | AWS S3 / MinIO |
 | Pasarela de pago | Procesamiento de pagos con tarjeta | Stripe |
 | Servidor de email | Envío de notificaciones transaccionales | SMTP (Spring Mail) |
@@ -88,7 +88,7 @@ La plataforma se construye con una API REST en Spring Boot (Java 17) como backen
 | Framework backend | Spring Boot | 3.3.x |
 | Seguridad | Spring Security | 6.x |
 | Persistencia | Spring Data JPA + Hibernate | 3.3.x |
-| Base de datos | PostgreSQL | 16 |
+| Base de datos | H2 | 2.x |
 | Migraciones BD | Flyway | 10.x |
 | Mapeo DTO | MapStruct | 1.5.x |
 | JWT | jjwt (io.jsonwebtoken) | 0.12.x |
@@ -101,7 +101,7 @@ La plataforma se construye con una API REST en Spring Boot (Java 17) como backen
 | Estado global | Redux Toolkit + RTK Query | 2.x |
 | Formularios | React Hook Form + Zod | 7.x / 3.x |
 | Estilos | Tailwind CSS + shadcn/ui | 3.x |
-| Tests backend | JUnit 5 + Mockito + Testcontainers | incluido / 1.19.x |
+| Tests backend | JUnit 5 + Mockito | incluido |
 | Tests frontend | Vitest + React Testing Library | latest |
 
 ## 6. Modelo de datos
@@ -181,7 +181,7 @@ Todas las dependencias están documentadas en `.specify/plans/tienda-muebles-onl
 | flyway-core | 10.x | Migraciones de BD | pendiente |
 | mapstruct | 1.5.x | Mapeo entidad ↔ DTO | pendiente |
 | jjwt-api / jjwt-impl | 0.12.x | JWT | pendiente |
-| testcontainers-postgresql | 1.19.x | Tests de integración | pendiente |
+| h2 (scope test) | 2.x | BD en memoria para tests | pendiente |
 | @stripe/react-stripe-js | latest | Formulario de pago seguro | pendiente |
 | @reduxjs/toolkit | 2.x | Estado global + fetching | pendiente |
 | react-hook-form | 7.x | Formularios | pendiente |
