@@ -6,7 +6,48 @@ applyTo: ".specify/specs/**,.specify/plans/**"
 # Control de versiones — Specs y Planes
 
 Este instruction file aplica automáticamente a todos los ficheros bajo `.specify/specs/` y `.specify/plans/`.
-**Antes de modificar cualquier fichero de estas rutas**, sigue el protocolo de versiones descrito a continuación.
+**Antes de modificar cualquier fichero de estas rutas**, sigue las reglas de separación de responsabilidades y el protocolo de versiones descritos a continuación.
+
+---
+
+## Separación obligatoria: Spec vs Plan
+
+Esta regla es **no negociable** y se aplica a todos los ficheros nuevos y existentes.
+
+### `.specify/specs/` — Solo contenido funcional
+
+Una spec describe **QUÉ** hace el sistema desde la perspectiva del usuario o del negocio. Nunca contiene detalles de implementación.
+
+**Permitido en specs:**
+- Descripción general del módulo (qué resuelve, para quién)
+- Flujos funcionales: actor, entrada, salida y pasos desde la perspectiva del usuario
+- Reglas de negocio y restricciones comportamentales
+- Requisitos de seguridad a nivel de comportamiento (ej: "las contraseñas se almacenan de forma segura", "las sesiones expiran")
+- Criterios de aceptación redactados en términos de comportamiento observable
+- Casos edge desde la perspectiva de negocio
+
+**Prohibido en specs:**
+- Nombres de librerías, frameworks o algoritmos específicos (BCrypt, SameSite=Strict, S256, JWKS…)
+- Esquemas de base de datos (tablas, columnas, tipos de datos)
+- Endpoints HTTP y contratos de API (rutas, métodos, payloads, códigos de respuesta concretos)
+- Detalles de implementación interna del backend (nombres de clases, métodos, eventos internos, nombres de tokens de proveedores)
+- Configuración técnica (flags de cookies, timeouts en ms, formatos internos de token)
+- Diagramas de secuencia técnica
+
+### `.specify/plans/` — Solo contenido técnico
+
+Un plan describe **CÓMO** se implementa lo que define la spec correspondiente.
+
+**Debe contener en plans:**
+- Stack tecnológico y justificación de decisiones
+- Estructura de ficheros y capas de la aplicación
+- Esquema de base de datos con tipos y migraciones
+- Contratos de API (endpoints, métodos HTTP, DTOs, códigos de respuesta)
+- Diagramas de arquitectura y secuencia técnica
+- Decisiones técnicas y alternativas descartadas
+- Dependencias externas y configuración
+
+**Referencia cruzada obligatoria:** todo plan debe incluir `> Spec de referencia: .specify/specs/<nombre>.md` en su cabecera.
 
 ---
 

@@ -1,8 +1,8 @@
 # Especificación — Tienda de Muebles Online
 
-> Versión: v1
+> Versión: v2
 > Fecha creación: 2026-06-16
-> Fecha última modificación: 2026-06-16
+> Fecha última modificación: 2026-06-17
 > Estado: BORRADOR
 > Autor: equipo
 
@@ -24,7 +24,7 @@ Permite a los usuarios explorar un catálogo de productos, gestionar un carrito 
 - Categorías jerárquicas (ej.: Salón > Sofás > Sofás de 3 plazas)
 
 ### 2.2 Autenticación y usuarios
-- Registro de usuario con email y contraseña (contraseña hasheada con BCrypt)
+- Registro de usuario con email y contraseña (contraseña almacenada de forma segura)
 - Login con JWT (access token + refresh token)
 - Roles: `CUSTOMER`, `ADMIN`
 - Perfil de usuario: dirección de envío, historial de pedidos
@@ -79,8 +79,8 @@ Permite a los usuarios explorar un catálogo de productos, gestionar un carrito 
 - [ ] El usuario recibe email de confirmación en menos de 2 minutos
 
 ### Pagos
-- [ ] Los datos de tarjeta nunca tocan el backend (Stripe.js en el front)
-- [ ] El webhook valida la firma de Stripe antes de procesar el evento
+- Los datos de tarjeta nunca son procesados por los servidores propios
+    - El webhook valida la autenticidad del proveedor de pagos antes de procesar el evento
 - [ ] Una devolución actualiza el estado del pedido a `CANCELADO` o `DEVOLUCION_PARCIAL`
 
 ### Panel de admin
@@ -129,6 +129,6 @@ Permite a los usuarios explorar un catálogo de productos, gestionar un carrito 
 ---
 ## Changelog
 
-| Versi�n | Fecha | Descripci�n del cambio |
+| Versi�n | Fecha | Descripci�n del cambio |
 |---------|-------|------------------------|
-| v1 | 2026-06-16 | Creaci�n inicial |
+| v1 | 2026-06-16 | Creaci�n inicial || v2 | 2026-06-17 | Eliminadas referencias a tecnologías específicas (BCrypt, Stripe.js); lenguaje de criterios de pago refactorizado a términos funcionales |

@@ -1,70 +1,60 @@
 # Especificación — Pasarela de Pagos
 
-> Versión: v1
+> Versión: v2
 > Fecha creación: 2026-06-17
 > Fecha última modificación: 2026-06-17
 > Estado: BORRADOR
 > Autor: equipo
+> Plan de referencia: `.specify/plans/pasarela-pagos.md`
 
 ---
 
 ## 1. Descripción general
 
-Módulo de pasarela de pagos para la Tienda de Muebles Online. Centraliza todos los flujos de cobro, devolución y conciliación, integrando métodos de pago modernos adaptados al mercado europeo y español.
+Módulo de pagos para la Tienda de Muebles Online. Centraliza todos los flujos de cobro, devolución y conciliación, con soporte para los métodos de pago más habituales en el mercado europeo y español.
 
-**Stack de pagos seleccionado:**
-
-| Proveedor | Rol |
-|-----------|-----|
-| **Stripe Payment Element** | Orquestador principal: tarjetas, wallets, BNPL |
-| **Bizum** (vía Stripe o Redsys) | Método local España — pago instantáneo |
-| **Apple Pay / Google Pay** | Wallets digitales en checkout web y móvil |
-| **Klarna** | Buy Now Pay Later (BNPL) — clave en venta de muebles |
-| **SEPA Direct Debit** | Domiciliación bancaria para pedidos corporativos |
+Los métodos de pago disponibles son: tarjeta de crédito/débito, wallets digitales (Apple Pay, Google Pay), Bizum, Klarna (pago aplazado) y domiciliación bancaria SEPA.
 
 **Requisitos de seguridad:**
-- Cumplimiento **PCI DSS nivel 1** — datos de tarjeta nunca tocan los servidores propios
-- **3D Secure 2.0 (3DS2)** obligatorio para todas las transacciones con tarjeta
-- Tokenización de métodos de pago para compras recurrentes / guardado de tarjeta
-- Firma y verificación de todos los webhooks entrantes
-- Cifrado TLS 1.3 en todos los endpoints de pago
-- Idempotency keys en todas las peticiones a APIs externas
+- Los datos de tarjeta nunca son procesados ni almacenados en los servidores propios
+- Los pagos con tarjeta requieren autenticación adicional del titular cuando el proveedor lo exige
+- Los métodos de pago pueden guardarse de forma segura para futuras compras, con consentimiento explícito del usuario
+- Las notificaciones de cobro del proveedor de pagos se verifican para garantizar su autenticidad antes de procesarlas
+- Una misma notificación de cobro procesada dos veces no debe generar efectos duplicados
 
 ---
 
 ## 2. Métodos de pago soportados
 
-### 2.1 Tarjeta de crédito / débito (Stripe)
+### 2.1 Tarjeta de crédito / débito
 - Visa, Mastercard, Amex
-- Interfaz: **Stripe Payment Element** (componente React preintegrado, PCI DSS out-of-the-box)
-- 3DS2 gestionado automáticamente por Stripe
-- Guardado de tarjeta tokenizada para futuros pagos (opt-in explícito del usuario)
+- El usuario introduce sus datos de tarjeta en un formulario de pago seguro
+- Si el banco del titular lo requiere, se solicita una verificación adicional de identidad
+- El usuario puede guardar la tarjeta para futuros pagos (opt-in explícito)
 
 ### 2.2 Wallets digitales
-- **Apple Pay**: activado vía Stripe si el navegador lo soporta; requiere verificación de dominio con Apple
-- **Google Pay**: activado vía Stripe; disponible en Chrome/Android
-- Detección automática en frontend — el botón del wallet se muestra solo si el dispositivo lo soporta
+- **Apple Pay**: disponible en dispositivos y navegadores compatibles con Apple Pay
+- **Google Pay**: disponible en dispositivos y navegadores compatibles con Google Pay
+- El botón del wallet se muestra solo si el dispositivo del usuario lo soporta
 
 ### 2.3 Bizum
-- Integración mediante **Stripe + Bizum** (disponible desde 2024 en la plataforma Stripe España) o alternativamente mediante **Redsys** (pasarela de referencia para Bizum en España)
-- Flujo: usuario introduce número de teléfono → confirmación en app Bizum → webhook de confirmación
+- El usuario introduce su número de teléfono y confirma el pago desde su app bancaria
 - Solo disponible para cuentas bancarias españolas
-- Límite por transacción: 1.000 € (límite Bizum actual)
+- Límite por transacción: 1.000 €
 
-### 2.4 Klarna (Buy Now Pay Later)
+### 2.4 Klarna (pago aplazado)
 - Modalidades disponibles:
   - **Paga en 3** — 3 plazos sin intereses
   - **Paga en 30 días** — período de gracia
   - **Financiación** — hasta 36 meses (sujeto a aprobación de Klarna)
-- Integración vía **Stripe + Klarna** (Klarna como payment method en Payment Element)
-- El vendedor recibe el importe completo al instante; Klarna asume el riesgo de crédito
+- La tienda recibe el importe completo al instante; Klarna asume el riesgo de crédito
 - Disponible para pedidos entre 35 € y 10.000 €
 
-### 2.5 SEPA Direct Debit
-- Para clientes B2B con pedidos recurrentes o corporativos
-- Mandato SEPA generado y firmado digitalmente durante el checkout
-- Liquidación en 5 días hábiles (no inmediata)
-- Gestión de devoluciones (chargebacks) SEPA dentro del panel de admin
+### 2.5 Domiciliación bancaria SEPA
+- Para clientes B2B con pedidos corporativos
+- El usuario firma un mandato de domiciliación durante el proceso de pago
+- La liquidación no es inmediata (5 días hábiles)
+- Las devoluciones por cargo indebido se gestionan desde el panel de administración
 
 ---
 
@@ -95,19 +85,18 @@ Módulo de pasarela de pagos para la Tienda de Muebles Online. Centraliza todos 
 
 ### 3.2 Guardado de método de pago
 
-- El usuario puede optar (opt-in explícito con checkbox) por guardar la tarjeta para futuros pagos
-- Backend crea un **Stripe Customer** vinculado al usuario si no existe
-- El `PaymentMethod` se adjunta al `Customer` de Stripe; en base de datos se guarda solo el `paymentMethodId` y los últimos 4 dígitos + marca (nunca datos sensibles)
+- El usuario puede optar (opt-in explícito con checkbox) por guardar el método de pago para futuras compras
+- El sistema asocia el método al perfil del usuario, almacenando únicamente datos no sensibles (marca, últimos 4 dígitos, fecha de expiración)
 - El usuario puede gestionar (listar, eliminar) sus métodos guardados desde su perfil
 
 ---
 
 ### 3.3 Pago con método guardado
 
-1. Frontend lista los `PaymentMethod` del usuario (datos no sensibles: marca, últimos 4, expiración)
-2. Usuario selecciona uno → backend crea PaymentIntent con `customer` y `payment_method` pre-rellenados
-3. Si requiere 3DS2, Stripe lo gestiona; si no, se confirma directamente
-4. Flujo de webhook idéntico al checkout estándar
+1. El usuario ve sus métodos de pago guardados (marca, últimos 4 dígitos, expiración)
+2. Usuario selecciona uno y confirma el pago
+3. Si el método requiere verificación adicional, el sistema la gestiona
+4. El flujo de confirmación es idéntico al checkout estándar
 
 ---
 
@@ -119,114 +108,59 @@ Módulo de pasarela de pagos para la Tienda de Muebles Online. Centraliza todos 
 **Pasos:**
 1. Admin selecciona pedido en estado `ENTREGADO` o `PAGADO` → pulsa "Emitir devolución"
 2. Admin indica importe (total o parcial) y motivo
-3. Backend crea un **Stripe Refund** contra el `PaymentIntent` original
-4. Stripe procesa la devolución (3–5 días hábiles para tarjeta, inmediato para Bizum/wallets)
-5. Webhook `charge.refunded` recibido y verificado → pedido actualizado a `DEVUELTO` (total) o `DEVOLUCION_PARCIAL`
-6. Email automático al cliente con el detalle de la devolución
+3. El sistema procesa la devolución a través del proveedor de pagos
+4. El proveedor confirma la devolución (3–5 días hábiles para tarjeta, antes para otros métodos)
+5. El sistema actualiza el estado del pedido a `DEVUELTO` o `DEVOLUCION_PARCIAL`
+6. El cliente recibe un email con el detalle de la devolución
 
 **Restricciones:**
 - Solo admins pueden emitir devoluciones
 - No se puede devolver más del importe original
-- Los pedidos en estado `CANCELADO` sin cargo previo no generan refund
+- Los pedidos en estado `CANCELADO` sin cargo previo no generan devolución
 
 ---
 
-### 3.5 Gestión de webhooks
+### 3.5 Notificaciones del proveedor de pagos
 
-Todos los webhooks de Stripe se reciben en `POST /api/payments/webhook`.
+El sistema recibe notificaciones del proveedor de pagos para mantener el estado de los pedidos actualizado en tiempo real. El sistema reacciona a: confirmación de cobro, fallo de pago, cancelación y devolución.
 
-| Evento | Acción en backend |
-|--------|-------------------|
-| `payment_intent.succeeded` | Pedido → `PAGADO`; publicar `OrderPaidEvent` |
-| `payment_intent.payment_failed` | Pedido → `FALLO_PAGO`; notificar usuario |
-| `payment_intent.canceled` | Pedido → `CANCELADO` |
-| `charge.refunded` | Pedido → `DEVUELTO` o `DEVOLUCION_PARCIAL` |
-| `customer.subscription.deleted` | (reservado para futuros planes) |
+Las notificaciones duplicadas son ignoradas para evitar inconsistencias. Las notificaciones con origen no verificado son rechazadas.
 
-**Seguridad de webhooks:**
-- Verificación obligatoria de `Stripe-Signature` usando `Stripe.constructEvent()` con el webhook secret almacenado en variable de entorno
-- Si la firma no es válida → responder `400 Bad Request` y log de alerta
-- Idempotencia: cada evento se procesa una sola vez (tabla `processed_webhook_events` con el `event.id`)
+> Para la implementación técnica (modelo de datos, contratos de API, configuración del proveedor de pagos), ver `.specify/plans/pasarela-pagos.md`.
 
 ---
 
-## 4. Modelo de datos (extensión)
+## 4. Criterios de aceptación
 
-### Tabla `payment_methods` (métodos guardados por usuario)
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `id` | UUID | PK |
-| `user_id` | UUID | FK → users |
-| `stripe_payment_method_id` | VARCHAR(64) | ID en Stripe |
-| `stripe_customer_id` | VARCHAR(64) | Customer en Stripe |
-| `brand` | VARCHAR(20) | visa, mastercard, klarna… |
-| `last_four` | CHAR(4) | Últimos 4 dígitos (solo tarjeta) |
-| `exp_month` | SMALLINT | Mes expiración |
-| `exp_year` | SMALLINT | Año expiración |
-| `type` | ENUM | CARD, BIZUM, APPLE_PAY, GOOGLE_PAY, KLARNA, SEPA |
-| `is_default` | BOOLEAN | Método por defecto del usuario |
-| `created_at` | TIMESTAMP | — |
-
-### Tabla `processed_webhook_events` (idempotencia)
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `stripe_event_id` | VARCHAR(64) | PK — ID único del evento Stripe |
-| `event_type` | VARCHAR(64) | Tipo de evento |
-| `processed_at` | TIMESTAMP | Cuándo se procesó |
-
-### Extensión tabla `orders`
-| Campo nuevo | Tipo | Descripción |
-|-------------|------|-------------|
-| `stripe_payment_intent_id` | VARCHAR(64) | ID del PaymentIntent |
-| `payment_method_type` | ENUM | CARD, BIZUM, APPLE_PAY, GOOGLE_PAY, KLARNA, SEPA |
-| `paid_at` | TIMESTAMP | Timestamp del cobro efectivo |
-| `refunded_amount` | DECIMAL(10,2) | Importe devuelto (0 si ninguno) |
-
----
-
-## 5. APIs expuestas
-
-| Método | Endpoint | Auth | Descripción |
-|--------|----------|------|-------------|
-| `POST` | `/api/payments/intent` | `CUSTOMER` | Crea PaymentIntent para un pedido |
-| `GET` | `/api/payments/methods` | `CUSTOMER` | Lista métodos de pago guardados |
-| `DELETE` | `/api/payments/methods/{id}` | `CUSTOMER` | Elimina método de pago guardado |
-| `POST` | `/api/payments/webhook` | Pública (firma Stripe) | Recibe eventos de Stripe |
-| `POST` | `/api/payments/refunds` | `ADMIN` | Emite devolución total o parcial |
-| `GET` | `/api/payments/transactions` | `ADMIN` | Listado de transacciones con filtros |
-
----
-
-## 6. Criterios de aceptación
-
-- [ ] Un usuario puede completar un pago con tarjeta pasando 3DS2
+- [ ] Un usuario puede completar un pago con tarjeta con verificación adicional de identidad cuando se requiere
 - [ ] Un usuario puede pagar con Apple Pay / Google Pay si su dispositivo lo soporta
 - [ ] Un usuario español puede pagar con Bizum
 - [ ] Un usuario puede seleccionar Klarna y fraccionar el pago en 3 plazos
-- [ ] Un usuario puede guardar una tarjeta y usarla en el siguiente pedido sin reintroducirla
+- [ ] Un usuario puede guardar un método de pago y usarlo en el siguiente pedido sin reintroducirlo
 - [ ] Un admin puede emitir una devolución total o parcial desde el panel
-- [ ] Un webhook duplicado de Stripe no genera un doble cobro ni doble actualización de estado
-- [ ] Un webhook con firma inválida es rechazado con 400 y registrado en logs
-- [ ] El PaymentIntent caducado no puede completar el pedido
+- [ ] Una notificación de cobro duplicada no genera un doble cobro ni doble actualización de estado
+- [ ] Una notificación con origen no verificado es rechazada y registrada en logs
+- [ ] Una sesión de pago caducada no puede confirmar el pedido
 - [ ] Los datos de tarjeta nunca son procesados ni almacenados en los servidores propios
 
 ---
 
-## 7. Casos edge
+## 5. Casos edge
 
 | Caso | Comportamiento esperado |
 |------|------------------------|
-| Pago aprobado pero webhook llega con retraso | El pedido permanece en `PENDIENTE_PAGO` hasta recibir el webhook; el frontend muestra estado "verificando" |
-| Usuario cierra el navegador durante 3DS2 | El PaymentIntent queda en `requires_action`; el pedido no se confirma |
-| Devolución después de que el banco ya liquidó | Stripe gestiona el refund igualmente; puede tardar hasta 10 días en algunas entidades |
+| Cobro confirmado pero la notificación del proveedor llega con retraso | El pedido permanece en `PENDIENTE_PAGO` hasta recibir la notificación; el usuario ve estado "verificando" |
+| Usuario cierra el navegador durante la verificación adicional de identidad | El pago no se confirma; el pedido permanece sin confirmar |
+| Devolución después de que el banco ya liquidó | El proveedor gestiona la devolución igualmente; puede tardar hasta 10 días en algunas entidades |
 | Klarna rechaza la financiación al usuario | El checkout muestra error claro con alternativas de pago; el pedido queda en `FALLO_PAGO` |
-| SEPA devuelto por fondos insuficientes | Webhook `charge.failed` recibido → pedido → `FALLO_PAGO`; email de notificación al cliente |
-| Bizum no disponible (mantenimiento) | El método se oculta en el frontend si Stripe reporta el método como no disponible |
-| Concurrencia: dos tabs del mismo usuario confirman el mismo pedido | Idempotency key en el PaymentIntent impide doble cobro |
+| SEPA devuelto por fondos insuficientes | El sistema recibe notificación de fallo → pedido → `FALLO_PAGO`; email de notificación al cliente |
+| Bizum no disponible (mantenimiento) | El método se oculta en el checkout si el proveedor reporta que no está disponible |
+| Dos tabs del mismo usuario confirman el mismo pedido simultáneamente | El sistema garantiza que solo un cobro se procesa |
 
 ---
 ## Changelog
 
 | Versión | Fecha | Descripción del cambio |
 |---------|-------|------------------------|
-| v1 | 2026-06-17 | Creación inicial — pasarela de pagos moderna con Stripe, Bizum, Apple Pay, Google Pay, Klarna y SEPA |
+| v1 | 2026-06-17 | Creación inicial |
+| v2 | 2026-06-17 | Eliminado contenido técnico (modelo de datos, APIs, tecnologías específicas); spec refactorizada para contener solo contenido funcional |

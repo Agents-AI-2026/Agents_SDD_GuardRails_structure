@@ -1,29 +1,27 @@
 # Especificación — Autenticación y Login
 
-> Versión: v1
+> Versión: v2
 > Fecha creación: 2026-06-16
-> Fecha última modificación: 2026-06-16
+> Fecha última modificación: 2026-06-17
 > Estado: BORRADOR
 > Autor: equipo
+> Plan de referencia: `.specify/plans/login.md`
 
 ---
 
 ## 1. Descripción general
 
-El módulo de **Autenticación** gestiona el registro de nuevos usuarios, login seguro con JWT, recuperación de contraseña, logout y **autenticación social** mediante OAuth 2.0 (Google, Microsoft, Apple).
+El módulo de **Autenticación** gestiona el registro de nuevos usuarios, login seguro, recuperación de contraseña, logout y **autenticación social** mediante proveedores de identidad externos (Google, Microsoft, Apple).
 Proporciona a los clientes y administradores un acceso controlado a la plataforma mediante:
-- Credenciales propias (email + contraseña hasheada)
+- Credenciales propias (email + contraseña)
 - Proveedores de identidad externos (Google, Microsoft, Apple)
 
 Requisitos de seguridad obligatorios:
-- Contraseñas hasheadas con BCrypt (factor de coste 12) para login tradicional
-- JWT con expiración (access token: 15 min, refresh token: 7 días)
-- Refresh token almacenado en cookie HttpOnly (no accesible desde JavaScript)
-- Validación de todas las entradas contra inyección XSS y SQL
-- Email de confirmación y recuperación de contraseña
-- OAuth 2.0 con validación de PKCE (Proof Key for Code Exchange)
-- Validación de firma ID token (OpenID Connect)
-- CSRF protection en flujos OAuth
+- Las contraseñas se almacenan de forma segura y nunca en texto plano
+- Las sesiones tienen una duración limitada y expiran automáticamente
+- La sesión activa se mantiene de forma segura, inaccesible desde scripts de la página
+- Todas las entradas se validan para prevenir ataques de inyección
+- Los flujos de autenticación social incluyen protección contra ataques de falsificación de solicitudes
 
 ---
 
@@ -33,25 +31,22 @@ Requisitos de seguridad obligatorios:
 
 **Actor:** Usuario anónimo  
 **Entrada:** Email, contraseña (mínimo 8 caracteres), nombre completo  
-**Salida:** Usuario creado, tokens JWT, email de confirmación enviado  
+**Salida:** Usuario creado, sesión iniciada, email de confirmación enviado  
 
 **Pasos:**
-1. Usuario envía POST `/api/auth/register` con email, password, nombre
-2. Backend valida email (formato correcto, no duplicado)
-3. Backend valida password (mínimo 8 caracteres, complejidad mínima)
-4. Backend hasea contraseña con BCrypt (factor 12)
-5. Backend crea usuario con rol `CUSTOMER`
-6. Backend genera tokens JWT y refresh token
-7. Backend almacena refresh token en BD con expiración (7 días)
-8. Backend envía email de confirmación a la dirección registrada
-9. Frontend recibe tokens y redirige a dashboard del usuario
+1. Usuario introduce email, contraseña y nombre completo
+2. El sistema valida que el email tiene formato correcto y no está registrado
+3. El sistema valida que la contraseña cumple los requisitos mínimos
+4. El sistema crea la cuenta con rol `CUSTOMER`
+5. El usuario recibe un email de confirmación
+6. El usuario queda autenticado y accede a su área personal
 
 **Restricciones:**
-- Email duplicado → 409 Conflict
-- Password < 8 caracteres → 400 Bad Request
-- Email inválido → 400 Bad Request
-- Fallo al enviar email → log de error, pero permite continuar
-- Máximo 5 intentos de registro fallidos en 1 hora desde mismo IP → 429 Too Many Requests
+- Email duplicado → error indicando que ya existe una cuenta con ese email
+- Contraseña < 8 caracteres → error de validación
+- Email inválido → error de validación
+- Fallo al enviar email → no bloquea el registro; se reintenta en segundo plano
+- Máximo 5 intentos de registro fallidos en 1 hora desde la misma IP → bloqueo temporal
 
 ---
 
@@ -88,54 +83,36 @@ Requisitos de seguridad obligatorios:
 
 ### 2.3 Refresh Token
 
-**Actor:** Usuario autenticado con token expirado  
-**Entrada:** Refresh token (cookie)  
-**Salida:** Nuevo access token  
+**Actor:** Usuario autenticado con sesión próxima a expirar  
+**Entrada:** Sesión activa  
+**Salida:** Sesión renovada  
 
 **Pasos:**
-1. Frontend detecta que access token expiró (401 o jwt.io validation)
-2. Frontend envía POST `/api/auth/refresh` (refresh token va automáticamente en cookie)
-3. Backend valida refresh token:
-   - Existe en BD
-   - No ha expirado (< 7 días)
-   - Firma JWT es válida
-4. Si válido:
-   - Genera nuevo access token (15 min)
-   - Retorna en body JSON
-   - NO renueva refresh token (refresh solo cada 7 días)
-5. Si inválido:
-   - Retorna 401 Unauthorized
-   - Frontend redirige a login
+1. El sistema detecta que la sesión de corta duración ha expirado
+2. El sistema renueva la sesión automáticamente usando la sesión de larga duración, sin interrumpir al usuario
+3. Si la sesión de larga duración también ha expirado, el usuario es redirigido al login
 
 **Restricciones:**
-- Refresh token NO se renueva automáticamente (solo al login)
-- Si refresh token expiró → usuario DEBE hacer login nuevamente
-- La cookie debe estar presente (validación HttpOnly)
+- La sesión de larga duración no se renueva automáticamente; solo se genera al hacer login
+- Si la sesión de larga duración expiró, el usuario debe autenticarse nuevamente
 
 ---
 
 ### 2.4 Logout
 
 **Actor:** Usuario autenticado  
-**Entrada:** Access token  
-**Salida:** Confirmación de logout, token invalidado  
+**Entrada:** Sesión activa  
+**Salida:** Sesión cerrada  
 
 **Pasos:**
-1. Usuario hace clic en "Logout"
-2. Frontend envía POST `/api/auth/logout` con access token en header `Authorization: Bearer <token>`
-3. Backend:
-   - Valida access token (firma y expiración)
-   - Busca el refresh token asociado y lo marca como `revoked` en BD
-   - Limpia la cookie HttpOnly (Set-Cookie con Max-Age=0)
-   - Retorna 200 OK
-4. Frontend:
-   - Borra el access token del localStorage/sessionStorage
-   - Redirige a homepage
-5. Usuario intenta acceder a recurso protegido → 401 Unauthorized
+1. Usuario hace clic en “Cerrar sesión”
+2. El sistema invalida la sesión activa de forma inmediata
+3. El usuario es redirigido a la página de inicio
+4. Cualquier intento posterior de acceder a recursos protegidos con la sesión cerrada es rechazado
 
 **Restricciones:**
-- El token se revoca inmediatamente (no espera expiración)
-- Logout debe ser posible sin internet (frontend lo maneja localmente)
+- La sesión se invalida de inmediato, no al expirar
+- El cierre de sesión funciona aunque no haya conectividad (el cliente elimina los datos locales de sesión)
 
 ---
 
@@ -259,48 +236,38 @@ Requisitos de seguridad obligatorios:
 ## 3. Criterios de aceptación
 
 ### Registro
-- [ ] Usuario registrado con email válido recibe token JWT
-- [ ] Email duplicado rechazado con 409 Conflict
-- [ ] Password < 8 caracteres rechazado con 400 Bad Request
-- [ ] Contraseña hasheada con BCrypt (factor 12) en BD
-- [ ] Email de confirmación enviado dentro de 2 minutos
-- [ ] Máximo 5 registros por IP en 1 hora → 429 Too Many Requests
+- [ ] Usuario registrado con email válido queda autenticado y accede a su área personal
+- [ ] Email duplicado rechazado con mensaje de error claro
+- [ ] Contraseña con menos de 8 caracteres rechazada con error de validación
+- [ ] Email de confirmación enviado en menos de 2 minutos
+- [ ] Máximo 5 intentos fallidos por IP en 1 hora → bloqueo temporal
 
 ### Login
-- [ ] Login exitoso retorna access token en body y refresh token en cookie
-- [ ] Credenciales inválidas retorna 401 sin revelar si email existe
-- [ ] Tras 5 fallos en 15 min, cuenta bloqueada temporalmente (15 min)
-- [ ] Access token expira a los 15 minutos
-- [ ] Refresh token expira a los 7 días
-- [ ] Cookie HttpOnly tiene flags: Secure, SameSite=Strict
+- [ ] Login exitoso da acceso al área personal del usuario
+- [ ] Credenciales inválidas muestran error genérico sin revelar si el email existe
+- [ ] Tras varios fallos consecutivos, la cuenta queda bloqueada temporalmente
+- [ ] La sesión de corta duración se renueva automáticamente mientras el usuario está activo
+- [ ] La sesión de larga duración expira y obliga a volver a hacer login
 
-### Refresh Token
-- [ ] Token expirado rechazado con 401
-- [ ] Refresh genera nuevo access token sin renovar el refresh
-- [ ] Refresh token NO reutilizable después de expiración (logout fuerza login)
+### Renovación de sesión
+- [ ] La sesión expirada no permite acceso sin una nueva renovación o login
+- [ ] La renovación no interrumpe la experiencia del usuario si la sesión larga sigue activa
 
-### Logout
-- [ ] Logout revoca refresh token inmediatamente
-- [ ] Acceso post-logout con token antiguo retorna 401
-- [ ] Cookie se borra del cliente (Max-Age=0)
+### Cierre de sesión
+- [ ] El cierre de sesión invalida el acceso de forma inmediata
+- [ ] Intentos de acceso post-logout son rechazados
 
 ### Recuperación de contraseña
-- [ ] Email de reset enviado en < 2 minutos
-- [ ] Token de reset válido por 1 hora
-- [ ] Contraseña reseteada invalida todos los refresh tokens activos
-- [ ] Mismo usuario no puede solicitar reset > 1 vez cada 5 minutos
+- [ ] Email de recuperación enviado en menos de 2 minutos
+- [ ] El enlace de recuperación expira tras un tiempo limitado
+- [ ] El restablecimiento cierra todas las sesiones activas del usuario
+- [ ] No se pueden solicitar resets en ráfaga (protección contra abuso)
 
-### Login OAuth (Google, Microsoft, Apple)
-- [ ] PKCE S256 implementado correctamente
-- [ ] `state` validado para prevenir CSRF (expiración 5 min)
-- [ ] ID token validado contra JWKS del proveedor
-- [ ] Solo se aceptan ID tokens con `email_verified=true`
-- [ ] Usuario nuevo creado automáticamente con email del proveedor
-- [ ] Vinculación OAuth: `{ provider, sub, email }` almacenada de forma única
-- [ ] Intento de login con email existente pero diferente `sub` → 400 error
-- [ ] Access token y refresh token retornados correctamente (mismo que login tradicional)
-- [ ] Logout invalida todos los tokens de la sesión OAuth
-- [ ] Proveedor de tokens (Google/Microsoft/Apple) no accesible desde frontend
+### Inicio de sesión con proveedores externos
+- [ ] El usuario puede iniciar sesión con Google, Microsoft y Apple
+- [ ] Un email no registrado con proveedores externos crea una cuenta nueva automáticamente
+- [ ] Un intento de login con un email ya registrado con otro proveedor es rechazado con mensaje claro
+- [ ] El cierre de sesión invalida también la sesión iniciada con proveedor externo
 
 ---
 
@@ -308,46 +275,31 @@ Requisitos de seguridad obligatorios:
 
 | Caso | Comportamiento esperado |
 |------|------------------------|
-| Usuario intenta registrar con email de otro usuario | 409 Conflict, mensaje: "Email ya registrado" |
-| Usuario hace login antes de confirmar email | Login exitoso (confirmación de email es optional) |
-| Token JWT malformado | 401 Unauthorized, mensaje: "Token inválido" |
-| Cookie HttpOnly perdida (navegador limpiado) | Refresh falla con 401, usuario redirigido a login |
-| Usuario intenta reset de contraseña 6 veces en 5 minutos | 6ª solicitud rechazada, retry posible después de 5 min |
-| Token de reset ya usado | 400 Bad Request, mensaje: "Token ya fue utilizado" |
-| Acceso a endpoint protegido sin Authorization header | 401 Unauthorized |
-| Usuario en cuenta bloqueada intenta login | 429 Too Many Requests, mensaje: "Cuenta temporalmente bloqueada, intente en 15 min" |
-| Email del servidor SMTP no funciona en reset | Log de error, usuario no recibe email pero puede reintentar |
-| XSS en campo email | Input sanitizado antes de almacenar, output escapado en templates |
-| CSRF en formulario de login | Token CSRF en cada POST (si aplica; con SPA + JWT + HttpOnly es menos crítico) |
-| Timing attack en login | Ambas rutas (user existe / contraseña incorrecta) tardan ~200ms (constant time hash) |
-| Usuario hace login OAuth cuando ya tiene cuenta local | 400 Bad Request: "Email ya registrado. Usa contraseña o vincula OAuth" |
-| `state` expirado (> 5 min después de iniciar flow) | 400 Bad Request: "Sesión expirada, intenta nuevamente" |
-| `auth_code` interceptado en URL | Código válido solo 1 vez; segundo intento falla (estándar OAuth) |
-| `code_verifier` no coincide con `code_challenge` | 400 Bad Request desde proveedor, backend rechaza |
-| Proveedor retorna `email_verified=false` | 400 Bad Request: "Por favor verifica tu email en [proveedor]" |
-| Usuario autoriza en proveedor pero cancela en app | Frontend maneja navegación; sesión expira en 5 min |
-| Mismo email registrado en dos proveedores (Google y Microsoft) | Dos usuarios locales diferentes, cada uno vinculado a su proveedor |
-| Usuario intenta revocar acceso OAuth después de login | Posible solo desde panel de proveedores externos (Google/Microsoft/Apple); backend solo desvincula al logout |
-| ID token expirado (> 5 min de emisión) | 400 Bad Request: "ID token expirado, intenta nuevamente" |
-| XSS en `redirect_uri` | Frontend valida que sea la URL correcta; backend valida contra whitelist |
-| Llamada directa a `/api/auth/oauth/callback` sin `code` | 400 Bad Request |
-| Refresh token de OAuth se agotan tras 7 días | Usuario debe hacer login nuevamente (flujo OAuth completo) |
+| Usuario intenta registrar con email de otro usuario | Error indicando que ya existe una cuenta con ese email |
+| Usuario hace login antes de confirmar email | Login permitido (la confirmación de email es opcional) |
+| Sesión larga expirada (navegador sin uso prolongado) | El usuario es redirigido al login |
+| Usuario en cuenta bloqueada intenta login | Mensaje claro indicando que la cuenta está bloqueada temporalmente |
+| Email de recuperación no llega (error SMTP) | El usuario puede reintentar pasado un tiempo; el fallo se registra para auditoría |
+| Enlace de recuperación ya usado | Error claro indicando que el enlace ya fue utilizado |
+| Usuario intenta iniciar sesión con proveedor externo usando email ya registrado con otro proveedor | Error claro con indicación del método original |
+| Usuario cancela la autorización en el proveedor externo | El sistema redirige al login sin error, permitiendo reintentar |
+| El proceso de autenticación con proveedor externo expira por inactividad | El usuario es redirigido al login con mensaje para intentar de nuevo |
 
 ---
 
-## 5. No incluido (v1.0)
+## 5. No incluido (alcance v1)
 
 - [ ] Autenticación de dos factores (2FA)
-- [ ] Capcha en formularios
-- [ ] Session de usuario (solo JWT)
-- [ ] Single Sign-On (SSO)
-- [ ] Otros proveedores OAuth (GitHub, LinkedIn, etc.)
-- [ ] Account linking manual (vincular OAuth a cuenta existente sin crear nueva)
-- [ ] Revocación de acceso OAuth desde la app (solo desde el proveedor)
+- [ ] Captcha en formularios
+- [ ] Single Sign-On (SSO) empresarial
+- [ ] Otros proveedores de identidad externos (GitHub, LinkedIn, etc.)
+- [ ] Vinculación manual de proveedor externo a cuenta existente
+- [ ] Revocación de acceso al proveedor externo desde la app
 
 ---
 ## Changelog
 
-| Versi�n | Fecha | Descripci�n del cambio |
+| Versi�n | Fecha | Descripci�n del cambio |
 |---------|-------|------------------------|
-| v1 | 2026-06-16 | Creaci�n inicial |
+| v1 | 2026-06-16 | Creación inicial |
+| v2 | 2026-06-17 | Eliminado contenido técnico (algoritmos, endpoints HTTP, flags, tokens internos, tabla de proveedores OIDC); spec refactorizada para contener solo contenido funcional |
