@@ -1,6 +1,6 @@
 # Tareas — Tienda de Muebles Online
 
-> Fecha: 2026-06-16
+> Fecha: 2026-06-17
 > Plan de referencia: `.specify/plans/tienda-muebles-online.md`
 > Estado: PENDIENTE
 
@@ -10,14 +10,19 @@
 
 ### TASK-001 — Scaffolding del proyecto
 - **Estado**: `TODO`
-- **Descripción**: Inicializar los proyectos backend y frontend con la estructura de carpetas definida en el plan técnico.
+- **Descripción**: Inicializar los proyectos backend y frontend con la estructura de carpetas definida en el plan técnico. Debe funcionar tanto en modo Docker completo como en modo local (solo infraestructura en Docker).
 - **Subtareas**:
   - [ ] Crear proyecto Spring Boot con Spring Initializr (Java 17, dependencias: Web, Security, Data JPA, Validation, Mail, Flyway, Lombok)
   - [ ] Crear proyecto React + TypeScript con Vite
-  - [ ] Configurar `docker-compose.yml` con H2 (modo servidor para dev) y MinIO
-  - [ ] Configurar `application.yml` y `application-dev.yml` (sin secrets hardcodeados; usar variables de entorno)
+  - [ ] Configurar `docker-compose.yml` con H2 (modo servidor TCP), MinIO, backend y frontend
+  - [ ] Configurar `docker-compose.override.yml` con hot-reload (Vite volumen + Spring DevTools) y puerto debug JVM 5005
+  - [ ] Crear `.env.example` con todas las variables requeridas (sin valores reales); añadir `.env` al `.gitignore`
+  - [ ] Configurar `application.yml` y `application-dev.yml` (todas las URLs y secrets leídos de variables de entorno)
+  - [ ] Verificar arranque local: `docker compose up db minio -d` + `./mvnw spring-boot:run` + `npm run dev`
   - [ ] Configurar Flyway en el backend
-- **Criterio de aceptación**: `docker compose up` levanta la BD, MinIO, backend y frontend sin errores.
+- **Criterio de aceptación**:
+  - Modo Docker: `docker compose up --build` levanta los 4 servicios sin errores; frontend accesible en `:3000`, backend en `:8080`.
+  - Modo local: con solo `db` y `minio` en Docker, el backend y frontend arrancan en el host y se conectan correctamente a los servicios.
 
 ### TASK-002 — Seguridad base (Spring Security + JWT)
 - **Estado**: `TODO`

@@ -11,7 +11,7 @@
 ## 1. Estructura de repositorio
 
 ```
-tienda-muebles/
+juvise/
 ├── backend/                   # Spring Boot — Java 17
 │   ├── src/
 │   │   ├── main/
@@ -49,7 +49,10 @@ tienda-muebles/
 │   ├── vite.config.ts
 │   └── Dockerfile
 │
-├── docker-compose.yml         # H2 (modo servidor) + MinIO + backend + frontend
+├── docker-compose.yml              # Servicios completos: BD, MinIO, backend, frontend
+├── docker-compose.override.yml     # Overrides para desarrollo local (hot-reload, puertos)
+├── .env.example                    # Variables de entorno requeridas (sin valores reales)
+├── .env                            # Variables reales — NO commitear (en .gitignore)
 └── docs/
 ```
 
@@ -263,7 +266,77 @@ RefreshToken
 
 ---
 
-## 5. Seguridad
+## 5. Modos de ejecución
+
+La aplicación soporta dos modos de ejecución equivalentes. Ambos usan las mismas variables de entorno definidas en `.env` (copiar desde `.env.example`).
+
+### 5.1 Docker (recomendado para onboarding y CI)
+
+Levanta todos los servicios con un solo comando. No requiere Java, Node ni ninguna dependencia local instalada.
+
+```bash
+# Clonar y configurar entorno
+cp .env.example .env        # rellenar valores
+
+# Arrancar todos los servicios
+docker compose up --build
+
+# Servicios disponibles:
+#   Frontend  → http://localhost:3000
+#   Backend   → http://localhost:8080
+#   MinIO UI  → http://localhost:9001
+```
+
+`docker-compose.yml` define:
+| Servicio | Imagen | Puerto |
+|----------|--------|--------|
+| `db` | H2 (modo servidor TCP) | 9092 |
+| `minio` | minio/minio | 9000 / 9001 (consola) |
+| `backend` | build `./backend/Dockerfile` | 8080 |
+| `frontend` | build `./frontend/Dockerfile` | 3000 |
+
+`docker-compose.override.yml` activa en desarrollo:
+- Hot-reload del frontend (Vite dev server con volumen montado)
+- Hot-reload del backend (Spring DevTools)
+- Exposición de puertos de debug (5005 para JVM)
+
+### 5.2 Local (recomendado para desarrollo activo)
+
+Arranca la BD y MinIO en Docker; backend y frontend corren directamente en el host para máximo rendimiento de recarga.
+
+**Requisitos previos:**
+- Java 17 (recomendado: SDKMAN `sdk install java 17-tem`)
+- Node.js 20 LTS + npm 10
+- Docker Desktop (solo para BD y MinIO)
+
+```bash
+# 1. Levantar solo servicios de infraestructura
+docker compose up db minio -d
+
+# 2. Backend (desde juvise/backend/)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# → http://localhost:8080
+
+# 3. Frontend (desde juvise/frontend/)
+npm install
+npm run dev
+# → http://localhost:3000
+```
+
+**Variables de entorno — resumen por modo:**
+
+| Variable | Docker | Local |
+|----------|--------|-------|
+| `DB_URL` | `jdbc:h2:tcp://db:9092/muebles` | `jdbc:h2:tcp://localhost:9092/muebles` |
+| `MINIO_ENDPOINT` | `http://minio:9000` | `http://localhost:9000` |
+| `FRONTEND_URL` | `http://frontend:3000` | `http://localhost:3000` |
+| `BACKEND_URL` (Vite) | `http://backend:8080` | `http://localhost:8080` |
+
+> Todas las variables sensibles (`JWT_SECRET`, `STRIPE_SECRET_KEY`, `SMTP_PASSWORD`, etc.) se definen únicamente en `.env` y nunca se hardcodean en código.
+
+---
+
+## 6. Seguridad
 
 - **Autenticación**: JWT (access 15 min + refresh 7 días almacenado en cookie HttpOnly)
 - **Autorización**: Spring Security con roles `CUSTOMER` y `ADMIN`; anotaciones `@PreAuthorize`
@@ -278,7 +351,7 @@ RefreshToken
 
 ---
 
-## 6. Diagrama de arquitectura
+## 7. Diagrama de arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -310,7 +383,7 @@ RefreshToken
 
 ---
 
-## 7. Decisiones de arquitectura (ADRs)
+## 8. Decisiones de arquitectura (ADRs)
 
 | # | Decisión | Alternativas | Razón |
 |---|----------|--------------|-------|
@@ -325,6 +398,6 @@ RefreshToken
 ---
 ## Changelog
 
-| Versi�n | Fecha | Descripci�n del cambio |
+| Versi�n | Fecha | Descripci�n del cambio |
 |---------|-------|------------------------|
-| v1 | 2026-06-16 | Creaci�n inicial |
+| v1 | 2026-06-16 | Creaci�n inicial |

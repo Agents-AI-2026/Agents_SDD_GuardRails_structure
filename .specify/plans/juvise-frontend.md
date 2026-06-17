@@ -167,7 +167,7 @@ Endpoint de composición para la home — reduce las peticiones del cliente a un
 ## 4. Estructura de componentes — Frontend
 
 ```
-src/
+juvise/frontend/src/
 ├── pages/
 │   ├── HomePage.tsx                   # Composición de todas las secciones home
 │   ├── CatalogPage.tsx                # Listado con filtros + paginación
