@@ -1,6 +1,8 @@
 # Especificación — Tienda de Muebles Online
 
-> Fecha: 2026-06-16
+> Versión: v1
+> Fecha creación: 2026-06-16
+> Fecha última modificación: 2026-06-16
 > Estado: BORRADOR
 > Autor: equipo
 
@@ -123,3 +125,10 @@ Permite a los usuarios explorar un catálogo de productos, gestionar un carrito 
 - Chat en vivo con soporte
 - Comparador de productos
 - Multi-tienda / multi-tenant
+
+---
+## Changelog
+
+| Versi�n | Fecha | Descripci�n del cambio |
+|---------|-------|------------------------|
+| v1 | 2026-06-16 | Creaci�n inicial |

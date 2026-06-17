@@ -1,6 +1,8 @@
 # Especificación — Autenticación y Login
 
-> Fecha: 2026-06-16
+> Versión: v1
+> Fecha creación: 2026-06-16
+> Fecha última modificación: 2026-06-16
 > Estado: BORRADOR
 > Autor: equipo
 
@@ -342,3 +344,10 @@ Requisitos de seguridad obligatorios:
 - [ ] Otros proveedores OAuth (GitHub, LinkedIn, etc.)
 - [ ] Account linking manual (vincular OAuth a cuenta existente sin crear nueva)
 - [ ] Revocación de acceso OAuth desde la app (solo desde el proveedor)
+
+---
+## Changelog
+
+| Versi�n | Fecha | Descripci�n del cambio |
+|---------|-------|------------------------|
+| v1 | 2026-06-16 | Creaci�n inicial |

@@ -1,6 +1,8 @@
 # Plan técnico — Tienda de Muebles Online
 
-> Fecha: 2026-06-16
+> Versión: v1
+> Fecha creación: 2026-06-16
+> Fecha última modificación: 2026-06-16
 > Spec de referencia: `.specify/specs/tienda-muebles-online.md`
 > Estado: BORRADOR
 
@@ -319,3 +321,10 @@ RefreshToken
 | 5 | Stock decrementado atómicamente con `SELECT FOR UPDATE` | Optimistic locking | Garantía fuerte ante compras simultáneas del último stock |
 | 6 | Stripe Checkout / Elements en front | Pasarela propia | PCI DSS: datos de tarjeta nunca tocan nuestros servidores |
 | 7 | RTK Query para fetching | React Query | Integración natural con Redux; evita duplicar estado |
+
+---
+## Changelog
+
+| Versi�n | Fecha | Descripci�n del cambio |
+|---------|-------|------------------------|
+| v1 | 2026-06-16 | Creaci�n inicial |
